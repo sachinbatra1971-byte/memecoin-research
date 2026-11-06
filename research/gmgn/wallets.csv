@@ -1,0 +1,12 @@
+wallet,first_seen,last_checked,winning_coins_seen,coins,profit_on_our_coins_usd,flagged_on_a_coin,realized_30d_usd,pnl_30d_pct,buys_30d,sells_30d,buys_per_day_30d,gmgn_tags,no_buy_hold_ratio,verdict
+FfztZq1outrYfyYbKw5P4LGo4xUc4XYEdf7o91UdS7qu,2026-11-06,2026-11-06,2,Impeach|george,9909,1,-30036,-4,987,1196,33,axiom,0.02,reject: flagged bundler/dev/sniper on a coin
+3AeDtWNPwPnuUvxtPMtK2HJzHPpUyCxaU1wfv3sNiL8J,2026-11-06,2026-11-06,2,Impeach|PHILCOIN,4211,0,-63067,-15,2318,2105,77,,,reject: losing overall (30d)
+MriyaNN8TMp6qRWjfr723PK7xgQK7yCt7Kg2v2PQu7X,2026-11-06,2026-11-06,3,Impeach|george|ZELDA,2727,1,-75,0,469,453,16,,,reject: flagged bundler/dev/sniper on a coin
+6DQAGJT7VZPVBsuG4kn3AvpyHCEi7B2RFFvMZdbqQqqP,2026-11-06,2026-11-06,2,Impeach|george,2083,1,-77341,-6,5932,2920,198,,,reject: flagged bundler/dev/sniper on a coin
+5aLY85pyxiuX3fd4RgM3Yc1e3MAL6b7UgaZz6MS3JUfG,2026-11-06,2026-11-06,2,$LIBCOIN|ZELDA,554,1,247858,3,37188,37221,1240,,0.00,reject: flagged bundler/dev/sniper on a coin
+nACSaf7TzRVgXxynsB6ULWuVvjKhcxUt8tv8nA2pHgF,2026-11-06,2026-11-06,2,$LIBCOIN|george,7276,0,-3245,-2,989,1155,33,,,reject: losing overall (30d)
+kEFiAX3jo5NmemysQov342TZ9mGh6yp92GDRjhA8XDf,2026-11-06,2026-11-06,2,$LIBCOIN|ZELDA,245,1,26346,0,58833,59282,1961,sandwich_bot,0.01,reject: flagged bundler/dev/sniper on a coin
+4BQ6ATUt26GFdiYQfht23iwfKyYD9D7XbL5ATqNGk3xK,2026-11-06,2026-11-06,2,george|ZELDA,1931,0,192008,5,26695,26582,890,,,reject: bot-like volume
+DWEsdgm8dAs5krUHwtCjnDA8SLkvpRaAFaRJoxtCLK2K,2026-11-06,2026-11-06,2,george|PHILCOIN,2357,0,4017,34,58,59,2,,0.95,caution: mostly holds tokens it never bought
+21GVsBwBhQ2NCBP7tua4nS9g1iVQ99MbjV9LUufnpXAb,2026-11-06,2026-11-06,2,george|PHILCOIN,1568,1,-2666,-6,348,253,12,,,reject: flagged bundler/dev/sniper on a coin
+DJkHv8mQW1oGs1YMSkWaAXquUijNKCJDA4vrkbeERenH,2026-11-06,2026-11-06,1,ZELDA,658,1,-8141,-6,1487,685,50,,,reject: flagged bundler/dev/sniper on a coin
