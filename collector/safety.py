@@ -26,7 +26,7 @@ FIELDS = [
 
 
 def _rugcheck(token):
-    j = get_json(RC.format(token), tries=2, pause=3)
+    j = get_json(RC.format(token), tries=1, pause=3)
     if not isinstance(j, dict) or not j.get("mint"):
         return {}
     known = j.get("knownAccounts") or {}
@@ -60,7 +60,7 @@ def _rugcheck(token):
 
 
 def _gecko(token):
-    d = get_json(GT.format(token), GT_HDR, tries=2, pause=3)
+    d = get_json(GT.format(token), GT_HDR, tries=1, pause=3)
     pools = (d or {}).get("data") or []
     if not pools:
         return {}
@@ -75,10 +75,14 @@ def _gecko(token):
     return out
 
 
-def check(items, ts):
-    """items: list of (token, reason). Returns rows for FIELDS."""
+def check(items, ts, budget_s=240):
+    """items: list of (token, reason). Returns rows for FIELDS. Stops after budget_s seconds."""
     rows = []
+    start = time.time()
     for token, reason in items:
+        if time.time() - start > budget_s:
+            print(f"  safety: time budget used, {len(items) - len(rows)} left for next run")
+            break
         row = {"ts_utc": ts.strftime("%Y-%m-%d %H:%M"), "token": token, "reason": reason}
         row.update(_rugcheck(token))
         time.sleep(1.0)
