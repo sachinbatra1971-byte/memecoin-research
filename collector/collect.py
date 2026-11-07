@@ -15,6 +15,9 @@ import os
 import time
 
 from common import DATA, get_json, now_utc, read_csv, write_csv
+import safety
+
+SAFETY_PER_RUN = 50       # RugCheck + GeckoTerminal lookups per run (free limits)
 
 MAX_AGE_H = 48            # stop snapshotting after this age
 MIN_LIQ_TRACK = 5_000     # ignore dust pools (below Nikist minimum of $30K by a wide margin)
@@ -157,21 +160,41 @@ def main():
         tracked[t]["done"] = "1"
 
     cands = {r["pair"]: r for r in read_csv(CANDS)}
+    newc = []
     for r in rows:
         if (fnum(r["liq_usd"]) or 0) >= LOOSE_LIQ and (fnum(r["mcap"]) or 0) >= LOOSE_MCAP \
                 and r["pair"] and r["pair"] not in cands and r["pair_created_utc"]:
             cands[r["pair"]] = {"token": r["token"], "pair": r["pair"], "symbol": r["symbol"],
                                 "pair_created_utc": r["pair_created_utc"],
                                 "first_pass_utc": r["ts_utc"], "candles_done": "0"}
+            newc.append(r["token"])
     write_csv(CANDS, sorted(cands.values(), key=lambda r: r["pair_created_utc"]), CAND_FIELDS)
+
+    # Point-in-time safety data: coins that just qualified first, then new coins with real liquidity.
+    todo, seen_t = [], set()
+    for t in newc:
+        if t in tracked and tracked[t].get("safety") != "1" and t not in seen_t:
+            todo.append((t, "qualified")); seen_t.add(t)
+    for r in rows:
+        t = r["token"]
+        if t in tracked and tracked[t].get("safety") != "1" and t not in seen_t and (fnum(r["liq_usd"]) or 0) >= MIN_LIQ_TRACK:
+            todo.append((t, "first_seen")); seen_t.add(t)
+    todo = todo[:SAFETY_PER_RUN]
+    srows = safety.check(todo, ts) if todo else []
+    for sr in srows:
+        if sr.get("rc_score") is not None or sr.get("buyers_h1") is not None:
+            tracked[sr["token"]]["safety"] = "1"
+    if srows:
+        write_csv(os.path.join(DATA, "safety", ts.strftime("%Y-%m-%d"), ts.strftime("%H%M") + ".csv.gz"),
+                  srows, safety.FIELDS, gz=True)
 
     if rows:
         out = os.path.join(DATA, "snapshots", ts.strftime("%Y-%m-%d"), ts.strftime("%H%M") + ".csv.gz")
         write_csv(out, rows, SNAP_FIELDS, gz=True)
     write_csv(TRACKED, sorted(tracked.values(), key=lambda r: r["first_seen_utc"]),
-              TRACKED_FIELDS + ["done"])
+              TRACKED_FIELDS + ["done", "safety"])
     print(f"{ts:%Y-%m-%d %H:%M} UTC  discovered={len(new)} new={added} "
-          f"active={len(active)} snapshotted={len(rows)} retired={len(too_old)} total_tracked={len(tracked)} candidates={len(cands)}")
+          f"active={len(active)} snapshotted={len(rows)} retired={len(too_old)} total_tracked={len(tracked)} candidates={len(cands)} safety_checked={len(srows)}")
 
 
 if __name__ == "__main__":
