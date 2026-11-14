@@ -1,0 +1,27 @@
+name: backfill
+on:
+  schedule:
+    - cron: "20,50 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: backfill
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -u collector/backfill.py
+      - name: save data
+        run: |
+          git config user.name "collector-bot"
+          git config user.email "collector-bot@users.noreply.github.com"
+          git add data/backfill
+          git diff --cached --quiet || git commit -m "backfill $(date -u +'%Y-%m-%d %H:%M')"
+          git push || (git pull --rebase && git push) || (sleep 20 && git pull --rebase && git push) || (sleep 40 && git pull --rebase && git push)
