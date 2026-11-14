@@ -22,7 +22,7 @@ WSOL = "So11111111111111111111111111111111111111112"
 START_TS = 1794528000          # 2026-11-13 00:00 UTC: walk backwards from here
 STOP_TS = 1779062400           # 2026-05-18 00:00 UTC: ~6 months (GeckoTerminal free limit)
 BUDGET_S = 23 * 60
-LIST_BUDGET_S = 9 * 60
+LIST_BUDGET_S = 11 * 60
 ENS = [5, 10, 15, 20, 30, 60]
 
 BF = os.path.join(DATA, "backfill")
@@ -53,7 +53,7 @@ def rpc(method, params, tries=3):
                 time.sleep(3 * (a + 1)); continue
             return j
         except Exception as e:
-            print(f"  rpc {method} {type(e).__name__}"); time.sleep(3 * (a + 1))
+            print(f"  rpc {method} {getattr(e, 'code', type(e).__name__)}"); time.sleep(3 * (a + 1))
     return {}
 
 
@@ -74,9 +74,7 @@ def grad_from_tx(sig):
 
 def step_list(state, grads):
     added = 0
-    now = time.time()
-    backlog = sum(1 for g in grads.values() if g["status"] == "" and int(g["grad_ts"]) < now - 26 * 3600)
-    budget = LIST_BUDGET_S if backlog > 600 else 16 * 60
+    budget = LIST_BUDGET_S
     while time.time() - T0 < budget:
         if state.get("cursor_ts") and state["cursor_ts"] < STOP_TS:
             break
@@ -85,19 +83,23 @@ def step_list(state, grads):
             opt["before"] = state["cursor"]
         sigs = (rpc("getSignaturesForAddress", [MIGRATION, opt]).get("result")) or []
         if not sigs:
-            print("  list: no signatures returned", str(rpc("getSignaturesForAddress", [MIGRATION, opt]))[:200]); break
-        todo = [s["signature"] for s in sigs if not s.get("err") and (s.get("blockTime") or 0) < START_TS]
-        with cf.ThreadPoolExecutor(4) as ex:
-            for g in ex.map(grad_from_tx, todo):
-                if g:
-                    mint, bt = g
-                    if mint in grads:
-                        grads[mint]["grad_ts"] = str(min(int(grads[mint]["grad_ts"]), bt))
-                    else:
-                        grads[mint] = {"mint": mint, "grad_ts": str(bt), "status": ""}; added += 1
-        state["cursor"] = sigs[-1]["signature"]
-        state["cursor_ts"] = sigs[-1].get("blockTime")
-        print(f"  list: page to {time.strftime('%Y-%m-%d %H:%M', time.gmtime(state['cursor_ts'] or 0))} UTC, total grads {len(grads)}")
+            print("  list: no signatures returned"); break
+        for k in range(0, len(sigs), 100):
+            if time.time() - T0 > budget:
+                break
+            chunk = sigs[k:k + 100]
+            todo = [s["signature"] for s in chunk if not s.get("err") and (s.get("blockTime") or 0) < START_TS]
+            with cf.ThreadPoolExecutor(3) as ex:
+                for g in ex.map(grad_from_tx, todo):
+                    if g:
+                        mint, bt = g
+                        if mint in grads:
+                            grads[mint]["grad_ts"] = str(min(int(grads[mint]["grad_ts"]), bt))
+                        else:
+                            grads[mint] = {"mint": mint, "grad_ts": str(bt), "status": ""}; added += 1
+            state["cursor"] = chunk[-1]["signature"]
+            state["cursor_ts"] = chunk[-1].get("blockTime")
+        print(f"  list: reached {time.strftime('%Y-%m-%d %H:%M', time.gmtime(state['cursor_ts'] or 0))} UTC, total grads {len(grads)}")
     return added
 
 
