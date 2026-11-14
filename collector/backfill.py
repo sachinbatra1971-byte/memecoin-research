@@ -16,7 +16,7 @@ import urllib.request
 
 from common import DATA, UA, get_json, read_csv, write_csv
 
-RPC = "https://solana-rpc.publicnode.com"
+RPC = "https://api.mainnet-beta.solana.com"   # archival public RPC (40 req / 10 s per method)
 MIGRATION = "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg"
 WSOL = "So11111111111111111111111111111111111111112"
 START_TS = 1794528000          # 2026-11-13 00:00 UTC: walk backwards from here
@@ -58,6 +58,7 @@ def rpc(method, params, tries=3):
 
 
 def grad_from_tx(sig):
+    time.sleep(1.0)                                   # stay under the public RPC limit
     j = rpc("getTransaction", [sig, {"maxSupportedTransactionVersion": 0, "encoding": "jsonParsed"}])
     t = j.get("result")
     if not t or t.get("meta") is None or t["meta"].get("err"):
@@ -73,7 +74,10 @@ def grad_from_tx(sig):
 
 def step_list(state, grads):
     added = 0
-    while time.time() - T0 < LIST_BUDGET_S:
+    now = time.time()
+    backlog = sum(1 for g in grads.values() if g["status"] == "" and int(g["grad_ts"]) < now - 26 * 3600)
+    budget = LIST_BUDGET_S if backlog > 600 else 16 * 60
+    while time.time() - T0 < budget:
         if state.get("cursor_ts") and state["cursor_ts"] < STOP_TS:
             break
         opt = {"limit": 1000}
@@ -81,7 +85,7 @@ def step_list(state, grads):
             opt["before"] = state["cursor"]
         sigs = (rpc("getSignaturesForAddress", [MIGRATION, opt]).get("result")) or []
         if not sigs:
-            print("  list: no signatures returned"); break
+            print("  list: no signatures returned", str(rpc("getSignaturesForAddress", [MIGRATION, opt]))[:200]); break
         todo = [s["signature"] for s in sigs if not s.get("err") and (s.get("blockTime") or 0) < START_TS]
         with cf.ThreadPoolExecutor(4) as ex:
             for g in ex.map(grad_from_tx, todo):
