@@ -103,8 +103,8 @@ def step_list(state, grads):
     return added
 
 
-def series(rows):
-    m = {int(r[0]) // 60 * 60: r for r in rows}
+def series(rows, start=0):
+    m = {int(r[0]) // 60 * 60: r for r in rows if int(r[0]) >= start // 60 * 60}
     if not m:
         return 0, []
     ks = sorted(m)
@@ -163,7 +163,9 @@ def step_enrich(grads, results):
         if left() < 60:
             break
         batch = pend[i:i + 30]
-        pairs = get_json("https://api.dexscreener.com/tokens/v1/solana/" + ",".join(g["mint"] for g in batch)) or []
+        pairs = get_json("https://api.dexscreener.com/tokens/v1/solana/" + ",".join(g["mint"] for g in batch))
+        if not isinstance(pairs, list) or not pairs:
+            print("  enrich: DexScreener gave nothing for a batch - stopping this run"); break
         best = {}
         for p in pairs if isinstance(pairs, list) else []:
             t = (p.get("baseToken") or {}).get("address")
@@ -186,7 +188,7 @@ def step_enrich(grads, results):
             d = get_json(GT.format(p["pairAddress"], gts + 60000), GT_HDR, tries=3, pause=4)
             time.sleep(2.2)
             rows = (((d or {}).get("data") or {}).get("attributes") or {}).get("ohlcv_list") or []
-            first, B = series(rows)
+            first, B = series(rows, gts)
             ratio = float(p.get("marketCap") or p.get("fdv")) / float(p["priceUsd"])
             r = {"mint": g["mint"], "symbol": (p.get("baseToken") or {}).get("symbol"), "pair": p["pairAddress"],
                  "grad_ts": gts, "twitter": tw, "sample": sample, "ratio": round(ratio), "bars": len(B),
@@ -209,6 +211,13 @@ def main():
     state = json.load(open(STATE)) if os.path.exists(STATE) else {}
     grads = {r["mint"]: r for r in read_csv(GRADS)}
     results = read_csv(RES)
+    if not state.get("v2"):                     # one-time fix: redo coins hit by early bugs
+        bad = {r["mint"] for r in results if r.get("first_bar_s") not in ("", None) and int(r["first_bar_s"]) < -120}
+        results = [r for r in results if r["mint"] not in bad]
+        for g in grads.values():
+            if g["status"] == "nopair" or g["mint"] in bad:
+                g["status"] = ""
+        state["v2"] = 1
     added = step_list(state, grads)
     done = step_enrich(grads, results)
     json.dump(state, open(STATE, "w"))
