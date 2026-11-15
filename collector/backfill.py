@@ -24,6 +24,8 @@ STOP_TS = 1779062400           # 2026-05-18 00:00 UTC: ~6 months (GeckoTerminal 
 BUDGET_S = 23 * 60
 LIST_BUDGET_S = 11 * 60
 ENS = [5, 10, 15, 20, 30, 60]
+SAMPLE = 4                     # before 7 Nov: look up 1 in 4 graduations (public RPC is rate-limited)
+SAMPLE_FROM_TS = 1794009600    # 2026-11-07 00:00 UTC
 
 BF = os.path.join(DATA, "backfill")
 STATE = os.path.join(BF, "state.json")
@@ -53,7 +55,7 @@ def rpc(method, params, tries=3):
                 time.sleep(3 * (a + 1)); continue
             return j
         except Exception as e:
-            print(f"  rpc {method} {getattr(e, 'code', type(e).__name__)}"); time.sleep(3 * (a + 1))
+            print(f"  rpc {method} {getattr(e, 'code', type(e).__name__)}"); time.sleep(8 * (a + 1))
     return {}
 
 
@@ -88,8 +90,9 @@ def step_list(state, grads):
             if time.time() - T0 > budget:
                 break
             chunk = sigs[k:k + 100]
-            todo = [s["signature"] for s in chunk if not s.get("err") and (s.get("blockTime") or 0) < START_TS]
-            with cf.ThreadPoolExecutor(3) as ex:
+            todo = [s["signature"] for s in chunk if not s.get("err") and (s.get("blockTime") or 0) < START_TS
+                    and ((s.get("blockTime") or 0) >= SAMPLE_FROM_TS or sum(map(ord, s["signature"][:8])) % SAMPLE == 0)]
+            with cf.ThreadPoolExecutor(2) as ex:
                 for g in ex.map(grad_from_tx, todo):
                     if g:
                         mint, bt = g
