@@ -5,7 +5,7 @@ Fixed rules: buy ₹1,000 at minute 15 after graduation; filters = liquidity ≥
 - Plan B: sell half at +100% (₹1,000 back), rest at +200%.
 Day = IST date the coin graduated. Coins younger than 26 h are checked with live prices ("so far"). Completed days are locked once published.
 
-Updated 15 Nov 2026, 11:45 PM IST.
+Updated 16 Nov 2026, 11:59 PM IST.
 
 | Day (graduated) | Coins | A: won | A: avg back | A: day profit | B: won | B: avg back | B: day profit |
 |---|---|---|---|---|---|---|---|
@@ -19,8 +19,9 @@ Updated 15 Nov 2026, 11:45 PM IST.
 | 12 Nov | 9 | 44% | ₹1,105 | +₹947 | 33% | ₹1,200 | +₹1,797 |
 | 13 Nov | 7 | 14% | ₹854 | −₹1,022 | 14% | ₹823 | −₹1,243 |
 | 14 Nov | 7 | 43% | ₹1,092 | +₹644 | 43% | ₹1,470 | +₹3,290 |
-| 15 Nov (so far) | 3 | 67% | ₹1,290 | +₹871 | 67% | ₹1,143 | +₹429 |
-| **All days** | **95** | **60%** | **₹1,231** | **+₹21,921** | **43%** | **₹1,384** | **+₹36,480** |
+| 15 Nov | 6 | 67% | ₹1,290 | +₹1,742 | 67% | ₹1,511 | +₹3,064 |
+| 16 Nov (so far) | 2 | 50% | ₹1,152 | +₹303 | 50% | ₹1,592 | +₹1,185 |
+| **All days** | **100** | **60%** | **₹1,231** | **+₹23,095** | **44%** | **₹1,403** | **+₹40,300** |
 
 ## Entry time (6–13 Nov, safety data as seen at entry)
 | Bought at | A: won | A: avg back | B: won | B: avg back |
