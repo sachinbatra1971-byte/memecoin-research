@@ -77,6 +77,9 @@ def grad_from_tx(sig):
 def step_list(state, grads):
     added = 0
     budget = LIST_BUDGET_S
+    backlog = sum(1 for g in grads.values() if g["status"] == "")
+    if backlog > 1200:                          # let the analysis catch up first
+        print(f"  list: skipped, {backlog} coins still waiting for analysis"); return 0
     while time.time() - T0 < budget:
         if state.get("cursor_ts") and state["cursor_ts"] < STOP_TS:
             break
