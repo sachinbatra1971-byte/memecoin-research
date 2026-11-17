@@ -34,7 +34,8 @@ GRAD_FIELDS = ["mint", "grad_ts", "status"]
 RES = os.path.join(BF, "results.csv")
 RES_FIELDS = (["mint", "symbol", "pair", "grad_ts", "twitter", "sample", "ratio", "bars", "first_bar_s"]
               + [f"{p}{e}" for e in ENS for p in ("a", "b", "mc")]
-              + ["rc", "rc_mint", "rc_freeze", "rc_lp", "rc_top10", "rc_danger", "rc_holders"])
+              + ["rc", "rc_mint", "rc_freeze", "rc_lp", "rc_top10", "rc_danger", "rc_holders", "src"])
+GTB = "https://api.geckoterminal.com/api/v2/networks/solana"
 GT = "https://api.geckoterminal.com/api/v2/networks/solana/pools/{}/ohlcv/minute?aggregate=1&limit=1000&currency=usd&before_timestamp={}"
 GT_HDR = {"Accept": "application/json;version=20230203"}
 T0 = time.time()
@@ -160,11 +161,38 @@ def rugcheck(mint):
             "rc_top10": round(sum(pcts[:10]), 2), "rc_danger": len(danger), "rc_holders": j.get("totalHolders")}
 
 
+def gt_twitter(mint):
+    """1 if the token's own metadata lists a Twitter/X account, 0 if not, None if the request failed."""
+    d = get_json(f"{GTB}/tokens/{mint}/info", GT_HDR, tries=2, pause=5)
+    time.sleep(2.2)
+    if d is None:
+        return None
+    a = (d.get("data") or {}).get("attributes") or {}
+    return int(bool(a.get("twitter_handle")))
+
+
+def gt_pool(mint):
+    """Main pool + supply from GeckoTerminal, shaped like a DexScreener pair."""
+    d = get_json(f"{GTB}/tokens/{mint}?include=top_pools", GT_HDR, tries=2, pause=5)
+    time.sleep(2.2)
+    data = (d or {}).get("data") or {}
+    a = data.get("attributes") or {}
+    pools = ((data.get("relationships") or {}).get("top_pools") or {}).get("data") or []
+    if not a or not pools:
+        return None
+    try:
+        supply = float(a.get("normalized_total_supply") or float(a["total_supply"]) / 10 ** int(a.get("decimals") or 6))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return {"pairAddress": pools[0]["id"].split("_", 1)[-1], "priceUsd": "1", "marketCap": supply,
+            "baseToken": {"symbol": a.get("symbol")}}
+
+
 def step_enrich(grads, results):
     now = time.time()
     pend = [g for g in grads.values() if g["status"] == "" and int(g["grad_ts"]) < now - 26 * 3600]
     pend.sort(key=lambda g: -int(g["grad_ts"]))          # newest first, walking back in time
-    done = 0
+    done = fails = 0
     for i in range(0, len(pend), 30):
         if left() < 60:
             break
@@ -184,14 +212,21 @@ def step_enrich(grads, results):
         for g in batch:
             if left() < 40:
                 break
-            p = best.get(g["mint"])
-            if not p or not p.get("priceUsd") or not (p.get("marketCap") or p.get("fdv")):
-                g["status"] = "nopair"; continue
-            socials = (p.get("info") or {}).get("socials") or []
-            tw = int(any((s.get("type") or "").lower() == "twitter" for s in socials))
+            tw = gt_twitter(g["mint"])               # same Twitter source for every coin, old or new
+            if tw is None:                           # no info (or request failed)
+                fails += 1
+                if fails >= 5:
+                    break                            # GeckoTerminal not answering: try next run
+                g["status"] = "noinfo"; continue
+            fails = 0
             sample = int(not tw and int(g["grad_ts"]) % 10 == 0)
             if not tw and not sample:
                 g["status"] = "notw"; continue
+            p, src = best.get(g["mint"]), "ds"
+            if not p or not p.get("priceUsd") or not (p.get("marketCap") or p.get("fdv")):
+                p, src = gt_pool(g["mint"]), "gt"   # coin no longer listed on DexScreener
+                if not p:
+                    g["status"] = "nopair"; continue
             gts = int(g["grad_ts"])
             d = get_json(GT.format(p["pairAddress"], gts + 60000), GT_HDR, tries=3, pause=4)
             time.sleep(2.2)
@@ -200,7 +235,7 @@ def step_enrich(grads, results):
             ratio = float(p.get("marketCap") or p.get("fdv")) / float(p["priceUsd"])
             r = {"mint": g["mint"], "symbol": (p.get("baseToken") or {}).get("symbol"), "pair": p["pairAddress"],
                  "grad_ts": gts, "twitter": tw, "sample": sample, "ratio": round(ratio), "bars": len(B),
-                 "first_bar_s": (first - gts) if B else ""}
+                 "first_bar_s": (first - gts) if B else "", "src": src}
             for e in ENS:
                 if len(B) > e + 1:
                     r[f"a{e}"] = round(trade(B, e, "A"), 4); r[f"b{e}"] = round(trade(B, e, "B"), 4)
@@ -226,6 +261,11 @@ def main():
             if g["status"] == "nopair" or g["mint"] in bad:
                 g["status"] = ""
         state["v2"] = 1
+    if not state.get("v3"):                     # one-time: redo every coin with the uniform Twitter source
+        results = []
+        for g in grads.values():
+            g["status"] = ""
+        state["v3"] = 1
     added = step_list(state, grads)
     done = step_enrich(grads, results)
     json.dump(state, open(STATE, "w"))
