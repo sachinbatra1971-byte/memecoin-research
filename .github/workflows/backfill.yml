@@ -1,27 +1,70 @@
 name: backfill
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: backfill
   cancel-in-progress: false
 jobs:
-  run:
+  list:
     runs-on: ubuntu-latest
-    timeout-minutes: 28
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python -u collector/backfill.py
+        env:
+          BF_MODE: list
       - name: save data
         run: |
           git config user.name "collector-bot"
           git config user.email "collector-bot@users.noreply.github.com"
-          git add data/backfill
-          git diff --cached --quiet || git commit -m "backfill $(date -u +'%Y-%m-%d %H:%M')"
-          git push || (git pull --rebase && git push) || (sleep 20 && git pull --rebase && git push) || (sleep 40 && git pull --rebase && git push)
+          git add data/backfill/grads.csv data/backfill/state.json
+          git diff --cached --quiet && exit 0
+          git commit -q -m "backfill list $(date -u +'%Y-%m-%d %H:%M')"
+          for i in 1 2 3 4 5 6 7 8; do git pull --rebase -q && git push -q && exit 0; sleep $((RANDOM % 25 + 5)); done; exit 1
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -u collector/backfill.py
+        env:
+          BF_MODE: enrich
+          BF_SHARD: ${{ matrix.shard }}
+      - name: save data
+        run: |
+          git config user.name "collector-bot"
+          git config user.email "collector-bot@users.noreply.github.com"
+          git add data/backfill/status_${{ matrix.shard }}.csv data/backfill/results_${{ matrix.shard }}.csv
+          git diff --cached --quiet && exit 0
+          git commit -q -m "backfill shard ${{ matrix.shard }} $(date -u +'%Y-%m-%d %H:%M')"
+          for i in 1 2 3 4 5 6 7 8; do git pull --rebase -q && git push -q && exit 0; sleep $((RANDOM % 25 + 5)); done; exit 1
+  next:
+    needs: [list, enrich]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: start the next round if work is left
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git pull -q
+          if [ "$(BF_MODE=more python collector/backfill.py)" = "yes" ]; then gh workflow run backfill.yml --ref main; fi
