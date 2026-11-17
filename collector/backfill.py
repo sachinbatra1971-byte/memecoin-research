@@ -170,8 +170,10 @@ def step_enrich(grads, results):
             break
         batch = pend[i:i + 30]
         pairs = get_json("https://api.dexscreener.com/tokens/v1/solana/" + ",".join(g["mint"] for g in batch))
-        if not isinstance(pairs, list) or not pairs:
-            print("  enrich: DexScreener gave nothing for a batch - stopping this run"); break
+        if pairs is None:                       # request failed (not just "no pairs")
+            print("  enrich: DexScreener request failed - stopping this run"); break
+        if not isinstance(pairs, list):
+            pairs = []
         best = {}
         for p in pairs if isinstance(pairs, list) else []:
             t = (p.get("baseToken") or {}).get("address")
