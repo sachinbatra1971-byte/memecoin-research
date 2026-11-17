@@ -249,32 +249,61 @@ def step_enrich(grads, results):
     return done
 
 
+SHARDS = 4                      # analysis is split over parallel GitHub jobs (each gets its own rate limit)
+
+
+def shard_of(mint):
+    return sum(map(ord, mint)) % SHARDS
+
+
+def load_status():
+    st = {}
+    for k in range(SHARDS):
+        for r in read_csv(os.path.join(BF, f"status_{k}.csv")):
+            st[r["mint"]] = r["status"]
+    return st
+
+
 def main():
+    mode = os.environ.get("BF_MODE", "all")      # list | enrich | more | all
     os.makedirs(BF, exist_ok=True)
     state = json.load(open(STATE)) if os.path.exists(STATE) else {}
     grads = {r["mint"]: r for r in read_csv(GRADS)}
+    orig = {m: g["status"] for m, g in grads.items()}
+    for m, s in load_status().items():
+        if m in grads and not grads[m]["status"]:
+            grads[m]["status"] = s
+
+    if mode == "more":                           # is there still work? (used to chain runs)
+        pending = sum(1 for g in grads.values() if g["status"] == "")
+        listing_left = not (state.get("cursor_ts") and state["cursor_ts"] < STOP_TS)
+        print("yes" if pending or listing_left else "no")
+        return
+
+    if mode == "enrich":
+        k = int(os.environ["BF_SHARD"])
+        mine = {m: g for m, g in grads.items() if shard_of(m) == k}
+        rpath = os.path.join(BF, f"results_{k}.csv")
+        results = read_csv(rpath)
+        done = step_enrich(mine, results)
+        rows = [{"mint": m, "status": g["status"]} for m, g in mine.items() if g["status"] and not orig[m]]
+        write_csv(os.path.join(BF, f"status_{k}.csv"), rows, ["mint", "status"])
+        write_csv(rpath, results, RES_FIELDS)
+        left_n = sum(1 for g in mine.values() if g["status"] == "")
+        print(f"backfill shard {k}: {done} coins analysed this run, {len(results)} results in shard, {left_n} still waiting")
+        return
+
     results = read_csv(RES)
-    if not state.get("v2"):                     # one-time fix: redo coins hit by early bugs
-        bad = {r["mint"] for r in results if r.get("first_bar_s") not in ("", None) and int(r["first_bar_s"]) < -120}
-        results = [r for r in results if r["mint"] not in bad]
-        for g in grads.values():
-            if g["status"] == "nopair" or g["mint"] in bad:
-                g["status"] = ""
-        state["v2"] = 1
-    if not state.get("v3"):                     # one-time: redo every coin with the uniform Twitter source
-        results = []
-        for g in grads.values():
-            g["status"] = ""
-        state["v3"] = 1
     added = step_list(state, grads)
-    done = step_enrich(grads, results)
+    done = step_enrich(grads, results) if mode == "all" else 0
     json.dump(state, open(STATE, "w"))
     write_csv(GRADS, sorted(grads.values(), key=lambda r: -int(r["grad_ts"])), GRAD_FIELDS)
-    write_csv(RES, results, RES_FIELDS)
+    if mode == "all":
+        write_csv(RES, results, RES_FIELDS)
     st = {}
     for g in grads.values():
         st[g["status"] or "pending"] = st.get(g["status"] or "pending", 0) + 1
-    print(f"backfill: +{added} graduations listed (total {len(grads)}), {done} coins analysed, results {len(results)}, status {st}")
+    print(f"backfill ({mode}): +{added} graduations listed (total {len(grads)}), {done} analysed, status {st}")
 
 
 if __name__ == "__main__":
