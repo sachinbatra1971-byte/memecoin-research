@@ -34,7 +34,7 @@ GRAD_FIELDS = ["mint", "grad_ts", "status"]
 RES = os.path.join(BF, "results.csv")
 RES_FIELDS = (["mint", "symbol", "pair", "grad_ts", "twitter", "sample", "ratio", "bars", "first_bar_s"]
               + [f"{p}{e}" for e in ENS for p in ("a", "b", "mc")]
-              + ["rc", "rc_mint", "rc_freeze", "rc_lp", "rc_top10", "rc_danger", "rc_holders", "src"])
+              + ["rc", "rc_mint", "rc_freeze", "rc_lp", "rc_top10", "rc_danger", "rc_holders", "src", "ds_checked", "ds_profile_ts", "ds_boost_ts"])
 GTB = "https://api.geckoterminal.com/api/v2/networks/solana"
 GT = "https://api.geckoterminal.com/api/v2/networks/solana/pools/{}/ohlcv/minute?aggregate=1&limit=1000&currency=usd&before_timestamp={}"
 GT_HDR = {"Accept": "application/json;version=20230203"}
@@ -188,6 +188,41 @@ def gt_pool(mint):
             "baseToken": {"symbol": a.get("symbol")}}
 
 
+def ds_orders(mint):
+    """When (if ever) the team paid for a DexScreener profile / boost: earliest payment, unix seconds."""
+    j = get_json(f"https://api.dexscreener.com/orders/v1/solana/{mint}", tries=2, pause=5)
+    if not isinstance(j, dict):
+        return None
+    prof = [o.get("paymentTimestamp") for o in (j.get("orders") or [])
+            if o.get("type") == "tokenProfile" and o.get("status") == "approved" and o.get("paymentTimestamp")]
+    boost = [b.get("paymentTimestamp") for b in (j.get("boosts") or []) if b.get("paymentTimestamp")]
+    return {"ds_checked": "1", "ds_profile_ts": int(min(prof) / 1000) if prof else "",
+            "ds_boost_ts": int(min(boost) / 1000) if boost else ""}
+
+
+def step_orders(results, budget_s=8 * 60):
+    """Add DexScreener profile/boost payment times to coins that could pass the filters."""
+    t0, n = time.time(), 0
+    for r in results:
+        if time.time() - t0 > budget_s:
+            break
+        if r.get("ds_checked") or str(r.get("twitter")) != "1":
+            continue
+        try:
+            mc = float(r.get("mc15") or 0)
+        except ValueError:
+            mc = 0
+        if not 30000 <= mc <= 2e6:
+            continue
+        o = ds_orders(r["mint"])
+        time.sleep(1.1)
+        if o is None:
+            break
+        r.update(o)
+        n += 1
+    return n
+
+
 def step_enrich(grads, results):
     now = time.time()
     pend = [g for g in grads.values() if g["status"] == "" and int(g["grad_ts"]) < now - 26 * 3600]
@@ -285,12 +320,13 @@ def main():
         mine = {m: g for m, g in grads.items() if shard_of(m) == k}
         rpath = os.path.join(BF, f"results_{k}.csv")
         results = read_csv(rpath)
+        checked = step_orders(results)
         done = step_enrich(mine, results)
         rows = [{"mint": m, "status": g["status"]} for m, g in mine.items() if g["status"] and not orig[m]]
         write_csv(os.path.join(BF, f"status_{k}.csv"), rows, ["mint", "status"])
         write_csv(rpath, results, RES_FIELDS)
         left_n = sum(1 for g in mine.values() if g["status"] == "")
-        print(f"backfill shard {k}: {done} coins analysed this run, {len(results)} results in shard, {left_n} still waiting")
+        print(f"backfill shard {k}: {checked} DexScreener checks, {done} coins analysed this run, {len(results)} results in shard, {left_n} still waiting")
         return
 
     results = read_csv(RES)
