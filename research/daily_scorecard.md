@@ -5,7 +5,7 @@ Fixed rules: buy ₹1,000 at minute 15 after graduation; filters = liquidity ≥
 - Plan B: sell half at +100% (₹1,000 back), rest at +200%.
 Day = IST date the coin graduated. Coins younger than 26 h are checked with live prices ("so far"). Completed days are locked once published.
 
-Updated 26 Nov 2026, 4:30 PM IST.
+Updated 27 Nov 2026, 11:55 PM IST.
 
 **Warning (20 Nov):** these numbers include hindsight. Most coins in this table were first seen by the collector 30+ minutes after graduation, i.e. after the minute-15 buy, so the list favours coins that had already survived. Buying only what is actually visible at the time gives about break-even (Plan A won 33%, avg ₹998; Plan B avg ₹954 on 144 coins), matching the 6-month backfill (about 30% won, ₹980–₹1,050). Do not trade on this table alone.
 
@@ -31,9 +31,10 @@ Updated 26 Nov 2026, 4:30 PM IST.
 | 22 Nov | 5 | 40% | ₹1,068 | +₹341 | 20% | ₹1,078 | +₹390 |
 | 23 Nov | 7 | 29% | ₹973 | −₹189 | 14% | ₹980 | −₹140 |
 | 24 Nov | 4 | 50% | ₹1,152 | +₹606 | 50% | ₹1,317 | +₹1,268 |
-| 25 Nov (so far) | 3 | 33% | ₹1,013 | +₹38 | 33% | ₹1,064 | +₹193 |
-| 26 Nov (so far) | 7 | 57% | ₹1,211 | +₹1,477 | 57% | ₹1,558 | +₹3,902 |
-| **All days** | **164** | **57%** | **₹1,202** | **+₹33,130** | **43%** | **₹1,378** | **+₹62,031** |
+| 25 Nov | 2 | 0% | ₹735 | −₹530 | 0% | ₹735 | −₹530 |
+| 26 Nov (so far) | 5 | 60% | ₹1,235 | +₹1,174 | 60% | ₹1,544 | +₹2,718 |
+| 27 Nov (so far) | 5 | 20% | ₹902 | −₹492 | 20% | ₹857 | −₹713 |
+| **All days** | **166** | **55%** | **₹1,191** | **+₹31,767** | **42%** | **₹1,358** | **+₹59,411** |
 ## Realistic method (buy only what was visible, 15 min after we first saw it)
 | Day | Coins | A: won | A: profit | B: won | B: profit |
 |---|---|---|---|---|---|
@@ -55,8 +56,9 @@ Updated 26 Nov 2026, 4:30 PM IST.
 | 22 Nov | 5 | 40% | +₹341 | 20% | −₹251 |
 | 23 Nov | 7 | 71% | +₹2,310 | 29% | +₹472 |
 | 24 Nov | 8 | 50% | +₹1,212 | 12% | −₹1,508 |
-| 25 Nov (so far) | 4 | 50% | +₹606 | 25% | −₹448 |
-| **All days** | **185** | **35%** | **+₹3,152** | **21%** | **−₹9,786** |
+| 25 Nov | 6 | 50% | +₹909 | 33% | −₹297 |
+| 26 Nov (so far) | 9 | 33% | +₹114 | 22% | −₹58 |
+| **All days** | **196** | **35%** | **+₹3,569** | **21%** | **−₹9,694** |
 
 
 ## Entry time (6–13 Nov, safety data as seen at entry)
